@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Head Mouse (No Red Dot)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+<style>
+    /* 1. BASE STYLES */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background: #0f172a; color: white; 
+        height: 100dvh; width: 100vw; 
+        display: flex; flex-direction: column; overflow: hidden; 
+    }
+    
+    /* 2. HEADER - SINGLE ROW */
+    header { 
+        background: #1e293b; padding: 5px; 
+        display: flex; gap: 6px; 
+        align-items: center; 
+        height: 140px; 
+        flex-shrink: 0; 
+        border-bottom: 2px solid #334155; z-index: 1000;
+        flex-wrap: wrap; 
+        align-content: center;
+        justify-content: center;
+    }
+    
+    /* SLIDERS */
+    .controls-area {
+        display: flex; gap: 5px; 
+        background: #0f172a; padding: 2px 8px; border-radius: 6px; border: 1px solid #334155;
+        flex-grow: 1; 
+        justify-content: center;
+        min-width: 250px;
+    }
+    .control-item { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 40px; flex: 1;}
+    .control-item label { font-size: 0.5rem; color: #94a3b8; margin-bottom: 1px; text-transform: uppercase; }
+    .control-item input { cursor: pointer; width: 100%; }
+
+    /* SYSTEM BUTTONS */
+    button.sys-btn { 
+        background: #3b82f6; color: white; border: none; 
+        padding: 8px 10px; border-radius: 6px; font-weight: 700; font-size: 0.75rem;
+        cursor: pointer; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        border: 2px solid #60a5fa; flex-grow: 1;
+    }
+    button.sys-btn:active { transform: translateY(2px); background: #2563eb; }
+    button.sys-btn:disabled { background: #334155; color: #64748b; cursor: not-allowed; border-color: #475569; }
+
+    /* ACTION BUTTONS (Header) */
+    button.act-btn {
+        font-weight: 800; font-size: 0.9rem; padding: 10px; border-radius: 6px;
+        cursor: pointer; border: none; color: white; flex-grow: 1;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    button.act-btn:active { transform: translateY(2px); }
+    
+    .btn-clr { background: #dc2626; border: 2px solid #f87171; }
+    .btn-del { background: #475569; border: 2px solid #94a3b8; }
+    .btn-speak { background: #16a34a; border: 2px solid #4ade80; color: black !important; min-width: 70px; }
+
+    /* MAGNET TARGETS */
+    .key.eye-target, .pred-word.eye-target, button.eye-target { 
+        background: #fbbf24 !important; color: black !important; border-color: white !important;
+        transform: scale(1.05); z-index: 10; 
+        box-shadow: 0 0 20px rgba(251, 191, 36, 1);
+    }
+
+    /* MAIN CONTENT */
+    .main { 
+        flex: 1; display: flex; flex-direction: column; 
+        padding: 5px; gap: 5px; overflow: hidden; position: relative;
+    }
+    
+    .display { 
+        flex-shrink: 0;
+        background: #000; padding: 5px; border-radius: 8px; 
+        font-size: 2rem; font-weight: 700; text-align: left; color: #fbbf24;
+        display: flex; align-items: center; padding-left: 10px;
+        border: 2px solid #334155; overflow: hidden; white-space: nowrap;
+        min-height: 60px;
+    }
+
+    #predBar {
+        display: flex; gap: 5px; justify-content: center; min-height: 50px; flex-shrink: 0;
+    }
+    .pred-word {
+        flex: 1; background: #4f46e5; color: white; font-size: 1.2rem; font-weight: 700;
+        border-radius: 6px; display: flex; align-items: center; justify-content: center;
+        cursor: pointer; border: 2px solid #818cf8; max-width: 200px;
+    }
+
+    /* GRID & KEYS */
+    .grid { 
+        display: grid; 
+        grid-template-columns: repeat(6, 1fr); 
+        grid-auto-rows: 1fr; /* FILL VERTICAL SPACE */
+        gap: 8px; 
+        flex: 1; 
+        overflow-y: auto; padding: 2px; 
+    }
+    
+    .key { 
+        background: #1e293b; color: white; 
+        font-size: 2.5rem; 
+        font-weight: 700; 
+        border-radius: 8px; display: flex; align-items: center; justify-content: center; 
+        cursor: pointer; user-select: none; border: 1px solid #334155; transition: all 0.1s;
+    }
+    
+    /* Space button in grid */
+    .key-space {
+        grid-column: span 2; 
+        background: #475569; border-color: #64748b;
+    }
+
+    .key.likely {
+        background: #064e3b; 
+        border: 2px solid #22c55e;
+        color: #4ade80;
+        box-shadow: 0 0 10px rgba(34, 197, 94, 0.3);
+    }
+
+    /* DRAGGABLE STATUS PANEL */
+    #statusPanel {
+        position: fixed; top: 150px; right: 10px; 
+        width: 200px; background: #111; border: 2px solid #444; 
+        border-radius: 8px; z-index: 2000;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+        display: flex; flex-direction: column; overflow: hidden;
+        transition: height 0.3s;
+    }
+    
+    #statusHeader {
+        width: 100%; height: 30px; background: #333; cursor: move;
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 0 10px; border-bottom: 1px solid #444;
+        touch-action: none;
+    }
+    #dragTitle { color: #aaa; font-size: 10px; font-weight: bold; letter-spacing: 1px; }
+    #minBtn { background: transparent; border: none; color: white; font-weight: bold; padding: 0; font-size: 18px; }
+    
+    #camWrapper { padding: 5px; display: flex; flex-direction: column; gap: 5px; }
+    
+    /* CAM VIEW */
+    #camview { 
+        width: 100%; height: 160px; 
+        background: #000; position: relative; border-radius:4px; overflow:hidden;
+        cursor: move;
+    }
+    
+    video { 
+        width: 100%; height: 100%; 
+        object-fit: cover; 
+        transform: scaleX(-1); 
+        position: absolute; top: 0; left: 0; z-index: 1;
+    }
+    
+    /* The Ghost Mesh (Moved here by JS) */
+    #webgazerFaceOverlay {
+        width: 100% !important; height: 100% !important;
+        position: absolute !important; top: 0 !important; left: 0 !important;
+        transform: scaleX(-1) !important;
+        z-index: 5 !important;
+        pointer-events: none !important;
+        display: block !important;
+    }
+
+    /* My Green/Blue Dots */
+    #overlayCanvas { 
+        width: 100%; height: 100%; 
+        object-fit: cover; 
+        transform: scaleX(-1); 
+        position: absolute; top: 0; left: 0; z-index: 10;
+        pointer-events: none;
+    }
+    
+    /* --- HIDE ANNOYING RED DOT & EXTRA VIDEO --- */
+    #webgazerGazeDot, #webgazerVideoFeed, #webgazerFaceFeedbackBox {
+        display: none !important;
+    }
+    
+    #loadingOverlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); color: #0f0; display: flex; align-items: center; justify-content: center; font-family: monospace; font-size: 12px; z-index: 20; pointer-events: none; }
+    #mouthDebugText { font-family: monospace; font-size: 10px; color: #888; text-align: center; }
+    .val-highlight { color: #fff; font-weight: bold; }
+    
+    #setupMouthBtn { 
+        width: 100%; background: #444; color: #888; border: none; padding: 8px; 
+        font-size: 10px; font-weight: bold; border-radius: 4px; transition: all 0.2s; 
+        position: relative; z-index: 30;
+    }
+    #setupMouthBtn.ready { background: #22c55e; color: black; cursor: pointer; animation: pulse 2s infinite; }
+    
+    @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); } 70% { box-shadow: 0 0 0 5px rgba(34, 197, 94, 0); } 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); } }
+    
+    #mouthStatusOverlay { position: absolute; top: 5px; left: 5px; z-index: 20; background: rgba(0,0,0,0.7); padding: 2px 5px; border-radius: 4px; font-weight: bold; font-family: monospace; font-size: 10px; color: #ef4444; border: 1px solid #ef4444; }
+    #mouthStatusOverlay.open { color: #22c55e; border-color: #22c55e; }
+    
+    #gazeIndicator { position: fixed; width: 20px; height: 20px; background: #3b82f6; border: 2px solid white; border-radius: 50%; pointer-events: none; z-index: 9999; display: none; transform: translate(-50%, -50%); box-shadow: 0 0 10px #3b82f6; }
+    
+    #centerOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 10000; display: none; flex-direction: column; align-items: center; justify-content: center; }
+    #centerCrosshair { width: 60px; height: 60px; border-radius: 50%; border: 5px solid #ef4444; position: relative; }
+    #centerCrosshair::before { content: ''; position: absolute; background: #ef4444; width: 4px; height: 100%; left: 50%; transform: translateX(-50%); }
+    #centerCrosshair::after { content: ''; position: absolute; background: #ef4444; height: 4px; width: 100%; top: 50%; transform: translateY(-50%); }
+    #centerText { margin-top: 20px; font-size: 2rem; color: white; font-weight: bold; }
+    
+    #statusPanel.minimized #camWrapper { display: none; }
+    #statusPanel.minimized { width: 120px; height: 30px; }
+    
+    /* HIDE STRAY CANVASES */
+    body > canvas { display: none !important; }
+</style>
+
+<script src="https://webgazer.cs.brown.edu/webgazer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/face_mesh.js" crossorigin="anonymous"></script>
+
+</head>
+<body>
+
+<header>
+    <div class="header-row" style="display:flex; width:100%; gap:8px;">
+        <button id="camBtn" class="sys-btn" onclick="startCamera()">Start</button>
+        <button id="calibrateBtn" class="sys-btn" onclick="startCenteringSequence()" disabled>Center</button>
+        <button id="trackBtn" class="sys-btn" onclick="toggleTracking()" disabled>Track</button>
+        <button id="saveBtn" class="sys-btn" onclick="saveAllSettings()">Save</button>
+        
+        <div class="controls-area">
+            <div class="control-item">
+                <label>Sens</label>
+                <input type="range" id="headSensRange" min="1" max="10" value="5" oninput="updateSettings(this, 'headSens')">
+            </div>
+            <div class="control-item">
+                <label>Smooth</label>
+                <input type="range" id="smoothRange" min="5" max="40" value="15" oninput="updateSettings(this, 'smooth')">
+            </div>
+            <div class="control-item">
+                <label>Magnet</label>
+                <input type="range" id="magnetRange" min="50" max="600" value="200" oninput="updateSettings(this, 'magnet')">
+            </div>
+        </div>
+    </div>
+
+    <div class="header-row" style="display:flex; width:100%; gap:5px;">
+        <button onclick="handleSpecial('CLR')" class="act-btn btn-clr">CLR</button>
+        <button onclick="handleSpecial('DEL')" class="act-btn btn-del">DEL</button>
+        <button onclick="handleSpecial('SPEAK')" class="act-btn btn-speak">SPEAK</button>
+    </div>
+</header>
+
+<div id="centerOverlay">
+    <div id="centerCrosshair"></div>
+    <div id="centerText">Look Here... 3</div>
+</div>
+
+<div id="statusPanel">
+    <div id="statusHeader">
+        <span id="dragTitle">⋮⋮ DRAG ME</span>
+        <button id="minBtn" onclick="toggleMinimize()">_</button>
+    </div>
+    <div id="camWrapper">
+        <div id="camview">
+            <div id="loadingOverlay">Click Start...</div>
+            <video id="inputVideo" autoplay playsinline muted></video>
+            <canvas id="overlayCanvas"></canvas> <div id="mouthStatusOverlay">--</div>
+        </div>
+        <div id="mouthDebugText">Val: <span id="valDisplay" class="val-highlight">0.00</span> | Trig: <span id="trigDisplay">0.05</span></div>
+        <button id="setupMouthBtn" onclick="runMouthCalibration()" disabled>Waiting for Face...</button>
+    </div>
+</div>
+
+<div class="main">
+    <div class="display" id="display">Start Camera</div>
+    <div id="predBar"></div>
+    <div class="grid" id="grid"></div>
+</div>
+
+<div id="gazeIndicator"></div>
+<div id="trainingTarget"></div>
+
+<script>
+// ============================================================================
+// 1. DRAG LOGIC
+// ============================================================================
+const panel = document.getElementById("statusPanel");
+const handle = document.getElementById("statusHeader");
+const camview = document.getElementById("camview");
+
+// Drag on header or video
+[handle, camview].forEach(el => {
+    el.addEventListener('mousedown', startDrag);
+    el.addEventListener('touchstart', startDrag, {passive: false});
+});
+
+function startDrag(e) {
+    if(e.target.tagName === 'BUTTON' || e.target.id === 'setupMouthBtn') return; 
+    e.preventDefault();
+    let startX = e.type === 'mousedown' ? e.clientX : e.touches[0].clientX;
+    let startY = e.type === 'mousedown' ? e.clientY : e.touches[0].clientY;
+    let startLeft = panel.offsetLeft;
+    let startTop = panel.offsetTop;
+
+    function moveDrag(e) {
+        let clientX = e.type === 'mousemove' ? e.clientX : e.touches[0].clientX;
+        let clientY = e.type === 'mousemove' ? e.clientY : e.touches[0].clientY;
+        panel.style.left = (startLeft + clientX - startX) + 'px';
+        panel.style.top = (startTop + clientY - startY) + 'px';
+        panel.style.right = 'auto'; 
+    }
+
+    function stopDrag() {
+        document.removeEventListener('mousemove', moveDrag); document.removeEventListener('mouseup', stopDrag);
+        document.removeEventListener('touchmove', moveDrag); document.removeEventListener('touchend', stopDrag);
+    }
+    document.addEventListener('mousemove', moveDrag); document.addEventListener('mouseup', stopDrag);
+    document.addEventListener('touchmove', moveDrag, {passive: false}); document.addEventListener('touchend', stopDrag);
+}
+function toggleMinimize() {
+    panel.classList.toggle('minimized');
+    const btn = document.getElementById('minBtn');
+    btn.textContent = panel.classList.contains('minimized') ? "+" : "_";
+}
+
+// ============================================================================
+// 2. DATA & PREDICTION
+// ============================================================================
+const commonWords = [
+    "THE","BE","TO","OF","AND","A","IN","THAT","HAVE","I","IT","FOR","NOT","ON","WITH","HE","AS","YOU","DO","AT",
+    "THIS","BUT","HIS","BY","FROM","THEY","WE","SAY","HER","SHE","OR","AN","WILL","MY","ONE","ALL","WOULD","THERE",
+    "THEIR","WHAT","SO","UP","OUT","IF","ABOUT","WHO","GET","WHICH","GO","ME","WHEN","MAKE","CAN","LIKE","TIME","NO",
+    "JUST","HIM","KNOW","TAKE","PEOPLE","INTO","YEAR","YOUR","GOOD","SOME","COULD","THEM","SEE","OTHER","THAN","THEN",
+    "NOW","LOOK","ONLY","COME","ITS","OVER","THINK","ALSO","BACK","AFTER","USE","TWO","HOW","OUR","WORK","FIRST","WELL",
+    "WAY","EVEN","NEW","WANT","BECAUSE","ANY","THESE","GIVE","DAY","MOST","US","PLEASE","WATER","HELP","PAIN","HUNGRY",
+    "TIRED","COLD","HOT","YES","MAYBE","TOMORROW","TODAY","LOVE","FAMILY","FRIEND","HOME"
+];
+
+let text = "";
+let currentWord = ""; 
+
+function updatePredictions() {
+    let matches = [];
+    if (currentWord.length > 0) {
+        matches = commonWords.filter(w => w.startsWith(currentWord));
+    } else {
+        matches = ["I", "THE", "YES", "NO"];
+    }
+    
+    const predBar = document.getElementById('predBar');
+    predBar.innerHTML = '';
+    const showMatches = matches.slice(0, 4);
+    
+    showMatches.forEach(word => {
+        const div = document.createElement('div');
+        div.className = 'pred-word';
+        div.textContent = word;
+        div.onclick = () => selectPredDOM(word);
+        predBar.appendChild(div);
+    });
+
+    document.querySelectorAll('.key').forEach(k => k.classList.remove('likely'));
+    if (currentWord.length > 0 && matches.length > 0) {
+        let nextChars = new Set();
+        matches.forEach(word => {
+            if (word.length > currentWord.length) {
+                nextChars.add(word[currentWord.length]);
+            }
+        });
+        nextChars.forEach(char => {
+            const el = document.getElementById('key-'+char);
+            if(el) el.classList.add('likely');
+        });
+    }
+}
+
+function selectPredDOM(word) {
+    if(currentWord.length > 0) {
+        text = text.slice(0, -currentWord.length);
+    }
+    text += word + " ";
+    currentWord = "";
+    updateDisplay();
+}
+
+// ============================================================================
+// 3. STATE & CONFIG
+// ============================================================================
+const keys = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z', 'SPACE'];
+let isTracking = false;
+let isCameraReady = false;
+let isFaceDetected = false; 
+let fineTuneActive = false;
+
+// Settings
+let HEAD_SENS = 3.5; 
+let SMOOTH_BUFFER = 15; 
+let MAGNET_RADIUS = 200; 
+let MOUTH_THRESHOLD = 0.05; 
+
+// Head Tracking Vars
+let centerNose = { x: 0.5, y: 0.5 };
+let currentNose = { x: 0.5, y: 0.5 };
+
+// Calibration State
+let mouthCalibStep = 0; 
+let closedVal = 0;
+let currentMouthRatio = 0;
+
+let xHist = [], yHist = [];
+let currentMagnetTarget = null;
+
+// ============================================================================
+// 4. INIT & SAVE
+// ============================================================================
+window.onload = function() {
+    const saved = localStorage.getItem('headSettings');
+    if(saved) {
+        const data = JSON.parse(saved);
+        if(data.smooth) { SMOOTH_BUFFER = data.smooth; document.getElementById('smoothRange').value = data.smooth; }
+        if(data.magnet) { MAGNET_RADIUS = data.magnet; document.getElementById('magnetRange').value = data.magnet; }
+        if(data.headSens) { 
+            document.getElementById('headSensRange').value = data.headSens;
+            updateSettings(document.getElementById('headSensRange'), 'headSens');
+        }
+        if(data.mouthTrig) { 
+            MOUTH_THRESHOLD = data.mouthTrig; 
+            document.getElementById('trigDisplay').textContent = MOUTH_THRESHOLD.toFixed(3);
+        }
+    }
+    updatePredictions();
+    
+    // --- FORCE REMOVE GHOSTS ON LOAD ---
+    setInterval(() => {
+        const ghosts = document.querySelectorAll('body > canvas');
+        ghosts.forEach(g => {
+            // Remove any canvas that is NOT our overlay and NOT inside our camview
+            if(g.id !== 'overlayCanvas' && g.parentNode !== document.getElementById('camview')) {
+                g.remove(); 
+            }
+        });
+    }, 1000);
+};
+
+function autoSave() {
+    const settings = { smooth: SMOOTH_BUFFER, magnet: MAGNET_RADIUS, mouthTrig: MOUTH_THRESHOLD, headSens: document.getElementById('headSensRange').value };
+    localStorage.setItem('headSettings', JSON.stringify(settings));
+}
+
+function saveAllSettings() {
+    autoSave();
+    try { webgazer.saveCurrentCalibrationData(); } catch(e){}
+    alert("Saved!");
+}
+
+// ============================================================================
+// 5. UI
+// ============================================================================
+const grid = document.getElementById('grid');
+keys.forEach(k => {
+    const btn = document.createElement('div');
+    btn.className = 'key';
+    
+    if (k === 'SPACE') {
+        btn.textContent = "SPACE";
+        btn.classList.add('key-space');
+    } else {
+        btn.textContent = k;
+        btn.id = 'key-' + k;
+    }
+    
+    btn.onclick = () => typeChar(k);
+    grid.appendChild(btn);
+});
+
+function updateSettings(el, type) {
+    const val = parseInt(el.value);
+    if(type === 'smooth') SMOOTH_BUFFER = val;
+    if(type === 'magnet') MAGNET_RADIUS = val;
+    if(type === 'headSens') HEAD_SENS = 1.0 + (val * 0.5); 
+    autoSave();
+}
+
+function typeChar(char) {
+    if(char === 'SPACE') {
+        text += " ";
+        currentWord = "";
+        updateDisplay();
+        return;
+    }
+    text += char;
+    currentWord += char;
+    updateDisplay();
+}
+
+function handleSpecial(action) {
+    if(action === 'CLR') {
+        text = "";
+        currentWord = "";
+    }
+    if(action === 'SPACE') {
+        text += " ";
+        currentWord = "";
+    }
+    if(action === 'DEL') {
+        text = text.slice(0, -1);
+        if(currentWord.length > 0) currentWord = currentWord.slice(0, -1);
+    }
+    if(action === 'SPEAK') window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+    updateDisplay();
+}
+
+function clearText() {
+    text = "";
+    currentWord = "";
+    updateDisplay();
+}
+
+function updateDisplay() {
+    document.getElementById('display').textContent = text || "Ready";
+    updatePredictions();
+}
+
+// ============================================================================
+// 6. START SYSTEM
+// ============================================================================
+async function startCamera() {
+    if(isCameraReady) return;
+    
+    const btn = document.getElementById('camBtn');
+    const overlay = document.getElementById('loadingOverlay');
+    btn.textContent = "Loading...";
+    btn.disabled = true;
+    overlay.textContent = "Requesting Camera...";
+    
+    try {
+        // 1. START LOCAL CAMERA
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+        const videoElement = document.getElementById('inputVideo');
+        videoElement.srcObject = stream;
+        await new Promise(resolve => videoElement.onloadedmetadata = resolve);
+        videoElement.play();
+        
+        overlay.textContent = "Downloading AI Model... (10s)";
+        
+        // 2. UNLOCK INTERFACE
+        isCameraReady = true;
+        btn.textContent = "Cam On";
+        btn.style.background = "#22c55e";
+        document.getElementById('calibrateBtn').disabled = false;
+        document.getElementById('trackBtn').disabled = false;
+        
+        // 3. START WEBGAZER (For Ghost Mesh)
+        webgazer.setRegression('ridge').saveDataAcrossSessions(true).begin();
+        // Force WebGazer not to create its own video, we have one
+        const wgVid = document.getElementById('webgazerVideoFeed');
+        if(wgVid) wgVid.style.display = 'none';
+
+        // 4. MERGE GHOST MESH INTO OUR BOX
+        const check = setInterval(() => {
+            const wo = document.getElementById('webgazerFaceOverlay');
+            const box = document.getElementById('camview');
+            
+            if (wo && box) {
+                // MOVE MESH
+                box.appendChild(wo);
+                // FORCE STYLE OVERRIDES
+                wo.style.position = 'absolute';
+                wo.style.top = '0';
+                wo.style.left = '0';
+                wo.style.width = '100%';
+                wo.style.height = '100%';
+                wo.style.zIndex = '5'; // Above video, below dots
+                wo.style.transform = 'scaleX(-1)';
+                wo.style.pointerEvents = 'none';
+                
+                overlay.style.display = 'none';
+                
+                // Start FaceMesh for nose tracking using the SAME video
+                initFaceMesh(videoElement);
+                clearInterval(check);
+            }
+        }, 1000);
+
+    } catch(e) {
+        alert("Error: " + e.message);
+        btn.disabled = false;
+    }
+};
+
+// ============================================================================
+// 7. FACEMESH (LOGIC ONLY - Visuals are handled separately)
+// ============================================================================
+function initFaceMesh(videoElement) {
+    const faceMesh = new FaceMesh({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`});
+    faceMesh.setOptions({maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5});
+    faceMesh.onResults(onResults);
+    
+    async function sendFrame() {
+        if(!videoElement.paused && !videoElement.ended) {
+            await faceMesh.send({image: videoElement});
+        }
+        requestAnimationFrame(sendFrame);
+    }
+    sendFrame();
+}
+
+function onResults(results) {
+    const canvas = document.getElementById('overlayCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Match dimensions to container
+    canvas.width = canvas.parentElement.clientWidth;
+    canvas.height = canvas.parentElement.clientHeight;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+        const lm = results.multiFaceLandmarks[0];
+        
+        // HEAD
+        currentNose = lm[4];
+        ctx.fillStyle = "#3b82f6"; ctx.beginPath(); ctx.arc(currentNose.x * canvas.width, currentNose.y * canvas.height, 4, 0, 2*Math.PI); ctx.fill();
+
+        // MOUTH
+        const upperLip = lm[13];
+        const lowerLip = lm[14];
+        const leftEye = lm[33];
+        const rightEye = lm[263];
+
+        ctx.fillStyle = "#22c55e";
+        ctx.beginPath(); ctx.arc(upperLip.x * canvas.width, upperLip.y * canvas.height, 3, 0, 2*Math.PI); ctx.fill();
+        ctx.beginPath(); ctx.arc(lowerLip.x * canvas.width, lowerLip.y * canvas.height, 3, 0, 2*Math.PI); ctx.fill();
+
+        const mouthH = Math.hypot(upperLip.x - lowerLip.x, upperLip.y - lowerLip.y);
+        const eyeDist = Math.hypot(leftEye.x - rightEye.x, leftEye.y - rightEye.y);
+        currentMouthRatio = mouthH / eyeDist;
+
+        document.getElementById('valDisplay').textContent = currentMouthRatio.toFixed(3);
+        
+        if(!isFaceDetected) {
+            isFaceDetected = true;
+            document.getElementById('setupMouthBtn').disabled = false;
+            document.getElementById('setupMouthBtn').classList.add('ready');
+            document.getElementById('setupMouthBtn').textContent = "Setup Mouth (2-Step)";
+        }
+
+        // TRIGGER
+        if (mouthCalibStep === 0) { 
+            if (currentMouthRatio > MOUTH_THRESHOLD) {
+                // RED LINE
+                ctx.strokeStyle = "red"; ctx.lineWidth = 4;
+                ctx.beginPath(); ctx.moveTo(upperLip.x * canvas.width, upperLip.y * canvas.height); 
+                ctx.lineTo(lowerLip.x * canvas.width, lowerLip.y * canvas.height); ctx.stroke();
+                
+                document.getElementById('mouthStatusOverlay').textContent = "OPEN";
+                document.getElementById('mouthStatusOverlay').className = "open";
+                triggerAction();
+            } else {
+                document.getElementById('mouthStatusOverlay').textContent = "CLOSED";
+                document.getElementById('mouthStatusOverlay').className = "";
+            }
+        }
+    }
+}
+
+// ============================================================================
+// 8. MOUTH CALIBRATION
+// ============================================================================
+function runMouthCalibration() {
+    const btn = document.getElementById('setupMouthBtn');
+    
+    if(mouthCalibStep === 0) {
+        mouthCalibStep = 1;
+        btn.textContent = "1. Keep Closed -> Click";
+        btn.style.background = "#fbbf24"; 
+    } else if (mouthCalibStep === 1) {
+        closedVal = currentMouthRatio;
+        mouthCalibStep = 2;
+        btn.textContent = "2. Open Wide -> Click";
+        btn.style.background = "#ef4444"; 
+    } else if (mouthCalibStep === 2) {
+        let openVal = currentMouthRatio;
+        if(openVal <= closedVal) {
+            alert("Error: Open was smaller than closed.");
+            mouthCalibStep = 0;
+            btn.textContent = "Setup Mouth (2-Step)";
+            btn.style.background = "#22c55e";
+            return;
+        }
+        MOUTH_THRESHOLD = (closedVal + openVal) / 2;
+        document.getElementById('trigDisplay').textContent = MOUTH_THRESHOLD.toFixed(3);
+        mouthCalibStep = 0;
+        btn.textContent = "Setup Mouth (2-Step)";
+        btn.style.background = "#22c55e";
+        autoSave();
+    }
+}
+
+// ============================================================================
+// 9. CENTER & TRACKING
+// ============================================================================
+function startCenteringSequence() {
+    if(!isFaceDetected) { alert("Wait for Face Detect"); return; }
+    const ol = document.getElementById('centerOverlay');
+    const txt = document.getElementById('centerText');
+    ol.style.display = 'flex';
+    let count = 3;
+    txt.textContent = "Look Here... " + count;
+    const timer = setInterval(() => {
+        count--;
+        if(count > 0) {
+            txt.textContent = "Look Here... " + count;
+        } else {
+            clearInterval(timer);
+            centerNose.x = currentNose.x;
+            centerNose.y = currentNose.y;
+            ol.style.display = 'none';
+            alert("Center Set! Click 'Track' to start.");
+        }
+    }, 1000);
+}
+
+function toggleTracking() {
+    if(!isCameraReady) { alert("Start Camera first!"); return; }
+    isTracking = !isTracking;
+    const btn = document.getElementById('trackBtn');
+    const cursor = document.getElementById('gazeIndicator');
+    
+    if(isTracking) {
+        btn.textContent = "Stop";
+        btn.style.background = "#ef4444";
+        cursor.style.display = "block";
+        xHist = []; yHist = [];
+        requestAnimationFrame(trackLoop);
+    } else {
+        btn.textContent = "3. Track";
+        btn.style.background = "#3b82f6";
+        cursor.style.display = "none";
+    }
+}
+
+function trackLoop() {
+    if(!isTracking) return;
+
+    let dx = currentNose.x - centerNose.x;
+    let dy = currentNose.y - centerNose.y;
+
+    let screenX = (window.innerWidth / 2) - (dx * window.innerWidth * HEAD_SENS);
+    let screenY = (window.innerHeight / 2) + (dy * window.innerHeight * HEAD_SENS);
+
+    xHist.push(screenX); yHist.push(screenY);
+    while(xHist.length > SMOOTH_BUFFER) { xHist.shift(); yHist.shift(); }
+    
+    const gx = xHist.reduce((a,b)=>a+b,0) / xHist.length;
+    const gy = yHist.reduce((a,b)=>a+b,0) / yHist.length;
+
+    const cursor = document.getElementById('gazeIndicator');
+    cursor.style.left = gx + "px"; cursor.style.top = gy + "px";
+
+    let bestEl = null;
+    let bestDist = Infinity;
+
+    // MAGNET TARGETS: Keys, Predictions, Action buttons, System Buttons
+    document.querySelectorAll('.key, .pred-word, .act-btn, .sys-btn').forEach(el => {
+        const rect = el.getBoundingClientRect();
+        const cx = rect.left + rect.width/2;
+        const cy = rect.top + rect.height/2;
+        const dist = Math.hypot(gx-cx, gy-cy);
+        
+        let radius = MAGNET_RADIUS;
+        if(el.classList.contains('likely')) radius *= 1.5;
+
+        if (dist < radius && dist < bestDist) {
+            bestDist = dist; 
+            bestEl = el;
+        }
+    });
+
+    if (bestEl) {
+        if(currentMagnetTarget !== bestEl) {
+            if(currentMagnetTarget) currentMagnetTarget.classList.remove('eye-target');
+            bestEl.classList.add('eye-target');
+            currentMagnetTarget = bestEl;
+        }
+    } else {
+        if(currentMagnetTarget) {
+            currentMagnetTarget.classList.remove('eye-target');
+            currentMagnetTarget = null;
+        }
+    }
+
+    requestAnimationFrame(trackLoop);
+}
+
+// ============================================================================
+// 10. CLICK ACTION
+// ============================================================================
+let lastClickTime = 0;
+
+function triggerAction() {
+    const now = Date.now();
+    if(now - lastClickTime < 800) return; 
+    lastClickTime = now;
+
+    if (isTracking && currentMagnetTarget) {
+        currentMagnetTarget.click();
+        const el = currentMagnetTarget;
+        const oldBg = el.style.background;
+        el.style.background = "white";
+        setTimeout(() => el.style.background = oldBg, 200);
+    }
+}
+
+window.addEventListener('click', (e) => {
+    if(e.target.tagName === 'BUTTON' || e.target.id === 'setupMouthBtn') return;
+});
+
+window.addEventListener('keydown', (e) => {
+    if(e.code === 'Space') {
+        e.preventDefault(); 
+        if (isTracking && currentMagnetTarget) {
+            currentMagnetTarget.click();
+            const el = currentMagnetTarget;
+            const oldBg = el.style.background;
+            el.style.background = "white";
+            setTimeout(() => el.style.background = oldBg, 200);
+        }
+    }
+});
+</script>
+</body>
+</html>
